@@ -1,4 +1,3 @@
-import os
 import streamlit as st
 from langchain_ollama import ChatOllama
 from langchain_core.output_parsers import StrOutputParser
@@ -10,14 +9,10 @@ from langchain_core.prompts import (
     ChatPromptTemplate
 )
 
-# =========================
-# 🔧 CONFIG (DEPLOYMENT SAFE)
-# =========================
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-
 # Custom CSS styling
 st.markdown("""
 <style>
+    /* Existing styles */
     .main {
         background-color: #1a1a1a;
         color: #ffffff;
@@ -28,20 +23,29 @@ st.markdown("""
     .stTextInput textarea {
         color: #ffffff !important;
     }
+
+    /* Add these new styles for select box */
     .stSelectbox div[data-baseweb="select"] {
         color: white !important;
         background-color: #3d3d3d !important;
     }
+
     .stSelectbox svg {
         fill: white !important;
     }
+
+    .stSelectbox option {
+        background-color: #2d2d2d !important;
+        color: white !important;
+    }
+
+    /* For dropdown menu items */
     div[role="listbox"] div {
         background-color: #2d2d2d !important;
         color: white !important;
     }
 </style>
 """, unsafe_allow_html=True)
-
 st.title("🧠 DeepSeek Code Companion")
 st.caption("🚀 Your AI Pair Programmer with Debugging Superpowers")
 
@@ -54,9 +58,6 @@ with st.sidebar:
         index=0
     )
     st.divider()
-    st.write("Base URL:")
-    st.code(OLLAMA_BASE_URL)
-    st.divider()
     st.markdown("### Model Capabilities")
     st.markdown("""
     - 🐍 Python Expert
@@ -67,46 +68,42 @@ with st.sidebar:
     st.divider()
     st.markdown("Built with [Ollama](https://ollama.ai/) | [LangChain](https://python.langchain.com/)")
 
-# =========================
-#  LLM INIT (FIXED)
-# =========================
+# initiate the chat engine
+
 llm_engine = ChatOllama(
     model=selected_model,
-    base_url=OLLAMA_BASE_URL,
+    base_url="http://localhost:11434",
+
     temperature=0.3
+
 )
 
-# System prompt
+# System prompt configuration
 system_prompt = SystemMessagePromptTemplate.from_template(
     "You are an expert AI coding assistant. Provide concise, correct solutions "
-    "with debugging help when needed. Always respond in English."
+    "with strategic print statements for debugging. Always respond in English."
 )
 
-# Session state
+# Session state management
 if "message_log" not in st.session_state:
-    st.session_state.message_log = [
-        {"role": "ai", "content": "Hi! I'm DeepSeek. How can I help you code today? 💻"}
-    ]
+    st.session_state.message_log = [{"role": "ai", "content": "Hi! I'm DeepSeek. How can I help you code today? 💻"}]
 
+# Chat container
 chat_container = st.container()
 
+# Display chat messages
 with chat_container:
     for message in st.session_state.message_log:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
+# Chat input and processing
 user_query = st.chat_input("Type your coding question here...")
 
-# =========================
-#  RESPONSE PIPELINE (SAFE)
-# =========================
 
 def generate_ai_response(prompt_chain):
-    try:
-        processing_pipeline = prompt_chain | llm_engine | StrOutputParser()
-        return processing_pipeline.invoke({})
-    except Exception as e:
-        return f"⚠️ Connection error: {str(e)}\n\n👉 Check if Ollama is running and accessible at {OLLAMA_BASE_URL}"
+    processing_pipeline = prompt_chain | llm_engine | StrOutputParser()
+    return processing_pipeline.invoke({})
 
 
 def build_prompt_chain():
@@ -118,28 +115,18 @@ def build_prompt_chain():
             prompt_sequence.append(AIMessagePromptTemplate.from_template(msg["content"]))
     return ChatPromptTemplate.from_messages(prompt_sequence)
 
-# =========================
-# CHAT FLOW
-# =========================
+
 if user_query:
+    # Add user message to log
     st.session_state.message_log.append({"role": "user", "content": user_query})
 
+    # Generate AI response
     with st.spinner("🧠 Processing..."):
         prompt_chain = build_prompt_chain()
         ai_response = generate_ai_response(prompt_chain)
 
+    # Add AI response to log
     st.session_state.message_log.append({"role": "ai", "content": ai_response})
 
+    # Rerun to update chat display
     st.rerun()
-
-# =========================
-# DEPLOYMENT NOTE
-# =========================
-st.info(
-    """
-     IMPORTANT DEPLOYMENT FIX:
-    - Do NOT use localhost in cloud deployment
-    - Set environment variable:
-      OLLAMA_BASE_URL=http://YOUR_SERVER_IP:11434
-    """
-)
